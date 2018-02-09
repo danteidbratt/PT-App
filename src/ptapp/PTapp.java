@@ -1,8 +1,6 @@
-
 package ptapp;
 
 import Models.*;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
@@ -32,7 +30,7 @@ public class PTapp {
                 writeNote();
                 break;
             case "2":
-                readNote();
+                readNotes();
                 break;
             case "3":
                 checkMemberActivity();
@@ -54,14 +52,26 @@ public class PTapp {
     
     private void writeNote(){
         System.out.println("\nWhich member does you note concern?");
-        int indID = repository.findIdForLatestIndividualSession(scanner.nextLine(), myAccout.getName());
-        if(indID != 0) {
-            System.out.println("\nWrite comment here:");
-            if(repository.addNote(indID, scanner.nextLine()) == 1){
-                System.out.println("Note added");
+        int indID = 0;
+        List<IndividualSession> attendedNoCommentWithMe = repository.getIndividualSessionsInMember(repository.getMember(scanner.nextLine()).getID()).stream()
+                .filter(a -> a.isAttendance() && a.getNote() == null && a.getTrainer().getName().equalsIgnoreCase(myAccout.getName()))
+                .collect(Collectors.toList());
+        if(attendedNoCommentWithMe.size() != 0) {
+            IndividualSession earliest = attendedNoCommentWithMe.get(0);
+            for (IndividualSession i : attendedNoCommentWithMe) {
+                if(i.getTimeScheduled().isBefore(earliest.getTimeScheduled())){
+                    earliest = i;
+                }
             }
-            else {
-                System.out.println("\nUnable to add note");
+            indID = earliest.getIndividualSessionID();
+            if(indID != 0) {
+                System.out.println("\nWrite comment here:");
+                if(repository.addNote(indID, scanner.nextLine()) == 1){
+                    System.out.println("Note added");
+                }
+                else {
+                    System.out.println("\nUnable to add note");
+                }
             }
         }
         else {
@@ -69,10 +79,17 @@ public class PTapp {
         }
     }
     
-    private void readNote(){
+    private void readNotes(){
         System.out.println("\nWhich members notes would you like to read?");
-        repository.getNotes(scanner.nextLine()).forEach(a -> System.out.println("\n" + a.getIndividualSession().getTimeScheduled().toString().replace('T', ' ') +
+        String input = scanner.nextLine();
+        List<Note> temp = repository.getNotes(input);
+        if(temp.size() > 0) {
+        temp.forEach(a -> System.out.println("\n" + a.getIndividualSession().getTimeScheduled().toString().replace('T', ' ') +
                 " - " + a.getComment()));
+        }
+        else {
+            System.out.println("\n" + input + " doesn't have any notes");
+        }
     }
     
     private void checkMemberActivity(){
@@ -80,7 +97,7 @@ public class PTapp {
         Member temp = repository.getMember(scanner.nextLine());
         if(temp.getIndividualSessions().size() > 0){
             List<IndividualSession> tempIndSess = temp.getIndividualSessions().stream()
-                    .filter(b -> b.isAttendance() && b.getTimeScheduled().isBefore(LocalDateTime.now())).collect(Collectors.toList());
+                    .filter(b -> b.isAttendance()).collect(Collectors.toList());
             if(tempIndSess.size() > 0) {
                     tempIndSess.forEach(a -> System.out.println("\nTränare: " + a.getTrainer().getName() + 
                                                 "\t\t-\tTillfälle: " + a.getTimeScheduled().toString().replace('T', ' ')));
@@ -96,7 +113,11 @@ public class PTapp {
     
     private void login() {
         System.out.println("\nWhat is your name?");
-        myAccout = repository.login(scanner.nextLine());
+        String input = scanner.nextLine();
+        if (input.equalsIgnoreCase("X")) {
+            System.exit(0);
+        }
+        myAccout = repository.login(input);
         if(myAccout != null) {
             while(!done){
                 start();
